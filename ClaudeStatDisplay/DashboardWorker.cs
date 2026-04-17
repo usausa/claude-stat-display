@@ -9,11 +9,11 @@ internal sealed class DashboardWorker : BackgroundService
     private const int RetryDelaySeconds = 5;
 
     private readonly DisplayStateStore store;
-    private readonly ILogger<DashboardWorker> log;
+    private readonly ILogger<DashboardWorker> logger;
 
-    public DashboardWorker(ILogger<DashboardWorker> log, DisplayStateStore store)
+    public DashboardWorker(ILogger<DashboardWorker> logger, DisplayStateStore store)
     {
-        this.log = log;
+        this.logger = logger;
         this.store = store;
     }
 
@@ -32,7 +32,7 @@ internal sealed class DashboardWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                log.WarnLcdDisplayError(ex);
+                logger.ErrorUnknownException(ex);
             }
 #pragma warning restore CA1031
 
@@ -64,17 +64,8 @@ internal sealed class DashboardWorker : BackgroundService
             var state = store.GetState();
             if (state != lastRenderedState)
             {
-#pragma warning disable CA1031
-                try
-                {
-                    currentImage = DashboardRenderer.Render(state);
-                    lastRenderedState = state;
-                }
-                catch (Exception ex)
-                {
-                    log.DebugRenderFailed(ex.Message);
-                }
-#pragma warning restore CA1031
+                currentImage = DashboardRenderer.Render(state);
+                lastRenderedState = state;
             }
 
             if (currentImage is not null)

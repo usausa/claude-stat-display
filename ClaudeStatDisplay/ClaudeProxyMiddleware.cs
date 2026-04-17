@@ -6,7 +6,7 @@ using System.Text.Json;
 
 internal sealed class ClaudeProxyMiddleware
 {
-    public const string UpstreamHeadersKey = "ClaudeProxy_UpstreamHeaders";
+    public const string UpstreamHeadersKey = "__ClaudeProxy_UpstreamHeaders";
 
     private static readonly Dictionary<string, int> ContextWindowSizes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -41,8 +41,9 @@ internal sealed class ClaudeProxyMiddleware
             return;
         }
 
+        // Capture messages
         var originalBody = context.Response.Body;
-        var buffer = new MemoryStream();
+        using var buffer = new MemoryStream();
         var teeStream = new TeeStream(originalBody, buffer);
         context.Response.Body = teeStream;
 
@@ -70,10 +71,9 @@ internal sealed class ClaudeProxyMiddleware
         var rateLimitInfo = ParseRateLimitHeaders(upstreamHeaders);
         var (usageInfo, model) = ParseResponseBody(bodyText, contentType);
 
-        DisplayState stateToLog;
+        DisplayState state;
         lock (stateLock)
         {
-            // 今回取得できなかった項目は最後に保持している値で補完してマージ
             var merged = new DisplayState(
                 model ?? lastState?.Model,
                 new UsageInfo(
@@ -90,17 +90,19 @@ internal sealed class ClaudeProxyMiddleware
                     rateLimitInfo.SevenDayReset ?? lastState?.RateLimit.SevenDayReset,
                     rateLimitInfo.OverageStatus ?? lastState?.RateLimit.OverageStatus,
                     rateLimitInfo.OverageDisabledReason ?? lastState?.RateLimit.OverageDisabledReason));
+            // TODO これは不要では無いのか？
             if (merged == lastState)
             {
                 return;
             }
             lastState = merged;
-            stateToLog = merged;
+            state = merged;
         }
 
-        imageStore.UpdateState(stateToLog);
+        imageStore.UpdateState(state);
     }
 
+    // TODO 移動、ContextWindowSizesの定義も
     internal static int GetContextWindowSize(string? model)
     {
         if (model is null)
@@ -135,10 +137,7 @@ internal sealed class ClaudeProxyMiddleware
         var overageStatus = ParseStringHeader(headers, "anthropic-ratelimit-unified-overage-status");
         var overageDisabledReason = ParseStringHeader(headers, "anthropic-ratelimit-unified-overage-disabled-reason");
 
-        return new RateLimitInfo(
-            fiveHourStatus, fiveHourUtilization, fiveHourReset,
-            sevenDayStatus, sevenDayUtilization, sevenDayReset,
-            overageStatus, overageDisabledReason);
+        return new RateLimitInfo(fiveHourStatus, fiveHourUtilization, fiveHourReset, sevenDayStatus, sevenDayUtilization, sevenDayReset, overageStatus, overageDisabledReason);
     }
 
     private static string? ParseStringHeader(Dictionary<string, string> headers, string name)
@@ -152,7 +151,7 @@ internal sealed class ClaudeProxyMiddleware
 
     private static (UsageInfo Usage, string? Model) ParseResponseBody(string body, string contentType)
     {
-        if (string.IsNullOrWhiteSpace(body))
+        if (String.IsNullOrWhiteSpace(body))
         {
             return (UsageInfo.Empty, null);
         }
@@ -171,11 +170,11 @@ internal sealed class ClaudeProxyMiddleware
         }
         catch (JsonException)
         {
-            // ボディ解析はベストエフォートのため、エラーは無視する
+            // Ignore
         }
         catch (InvalidOperationException)
         {
-            // ボディ解析はベストエフォートのため、エラーは無視する
+            // Ignore
         }
 
         return (UsageInfo.Empty, null);
@@ -183,12 +182,14 @@ internal sealed class ClaudeProxyMiddleware
 
     private static (UsageInfo Usage, string? Model) ParseSseBody(string body)
     {
-        int? inputTokens = null;
+        var inputTokens = default(int?);
+        // TODO default(int?)の記述に変子う
         int? outputTokens = null;
         int? cacheCreationInputTokens = null;
         int? cacheReadInputTokens = null;
         string? model = null;
 
+        // TODO spanベースに変更
         foreach (var line in body.Split('\n'))
         {
             var trimmed = line.TrimEnd('\r');
@@ -241,7 +242,7 @@ internal sealed class ClaudeProxyMiddleware
             }
             catch (JsonException)
             {
-                // 不正なSSEイベントはスキップ
+                // Ignore invalid SSE events
             }
         }
 
@@ -255,7 +256,7 @@ internal sealed class ClaudeProxyMiddleware
 
         var model = root.TryGetProperty("model", out var modelProp) ? modelProp.GetString() : null;
 
-        // /v1/messages レスポンス
+        // /v1/messages response
         if (root.TryGetProperty("usage", out var usage))
         {
             return (new UsageInfo(
@@ -265,7 +266,7 @@ internal sealed class ClaudeProxyMiddleware
                 GetInt(usage, "cache_read_input_tokens")), model);
         }
 
-        // /v1/messages/count_tokens レスポンス
+        // /v1/messages/count_tokens response
         if (root.TryGetProperty("input_tokens", out var inputTokensProp) && inputTokensProp.TryGetInt32(out var countTokens))
         {
             return (new UsageInfo(countTokens, null, null, null), model);

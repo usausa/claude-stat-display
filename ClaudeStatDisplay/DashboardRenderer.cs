@@ -90,10 +90,10 @@ internal static class DashboardRenderer
         DrawLabel(canvas, "TOKEN USAGE", x, ref y);
 
         var u = state.Usage;
-        DrawKV(canvas, "Input",         FormatNullableInt(u.InputTokens),               x, rightX, ref y);
-        DrawKV(canvas, "Output",        FormatNullableInt(u.OutputTokens),               x, rightX, ref y);
-        DrawKV(canvas, "Cache read",    FormatNullableInt(u.CacheReadInputTokens),       x, rightX, ref y);
-        DrawKV(canvas, "Cache created", FormatNullableInt(u.CacheCreationInputTokens),   x, rightX, ref y);
+        DrawKeyValue(canvas, "Input",         FormatNullableInt(u.InputTokens),               x, rightX, ref y);
+        DrawKeyValue(canvas, "Output",        FormatNullableInt(u.OutputTokens),               x, rightX, ref y);
+        DrawKeyValue(canvas, "Cache read",    FormatNullableInt(u.CacheReadInputTokens),       x, rightX, ref y);
+        DrawKeyValue(canvas, "Cache created", FormatNullableInt(u.CacheCreationInputTokens),   x, rightX, ref y);
 
         // CONTEXT WINDOW ────────────────────────────────────────────────────────
         var ctxSize = ClaudeProxyMiddleware.GetContextWindowSize(state.Model);
@@ -153,24 +153,24 @@ internal static class DashboardRenderer
         SKCanvas canvas, string label, double? utilization, string? status, string? resetTime,
         float x, ref float y, float panelW)
     {
-        const float LabelW = 52f;
-        const float BarH   = 28f;
-        var barX = x + LabelW;
-        var barW = panelW - LabelW;
+        const float labelW = 52f;
+        const float barH   = 28f;
+        var barX = x + labelW;
+        var barW = panelW - labelW;
         var color = StatusColor(status);
 
         // Axis label ("5H" / "7D")
         DrawText(canvas, label, x, y + 24, T.TextSecondary, 28);
 
         // Progress bar
-        DrawBar(canvas, barX, y, barW, BarH, (float)(utilization ?? 0.0), color);
+        DrawBar(canvas, barX, y, barW, barH, (float)(utilization ?? 0.0), color);
 
         // Percentage text inside bar, right-aligned
         var pctTxt = utilization.HasValue ? $"{utilization.Value * 100:F1}%" : "—";
         var pctW = MeasureText(pctTxt, 24);
-        DrawText(canvas, pctTxt, (barX + barW) - pctW - 6, (y + BarH) - 5, T.TextPrimary, 24);
+        DrawText(canvas, pctTxt, (barX + barW) - pctW - 6, (y + barH) - 5, T.TextPrimary, 24);
 
-        y += BarH + 5;
+        y += barH + 5;
 
         // Status badge (only when not "allowed") + reset time
         if ((status is not null) && (status != "allowed"))
@@ -193,7 +193,7 @@ internal static class DashboardRenderer
         y += 24 + 6;
     }
 
-    private static void DrawKV(SKCanvas canvas, string key, string value, float leftX, float rightX, ref float y)
+    private static void DrawKeyValue(SKCanvas canvas, string key, string value, float leftX, float rightX, ref float y)
     {
         DrawText(canvas, key, leftX, y + 28, T.TextSecondary, 28);
         var valueW = MeasureText(value, 28);
@@ -203,20 +203,20 @@ internal static class DashboardRenderer
 
     private static void DrawBar(SKCanvas canvas, float x, float y, float w, float h, float fraction, SKColor fillColor)
     {
-        const float R = 3f;
+        const float r = 3f;
 
         using var bg = new SKPaint();
         bg.Color = T.BarBgColor;
         bg.IsAntialias = true;
-        canvas.DrawRoundRect(SKRect.Create(x, y, w, h), R, R, bg);
+        canvas.DrawRoundRect(SKRect.Create(x, y, w, h), r, r, bg);
 
         var fw = Math.Max(0f, Math.Min(w, w * fraction));
-        if (fw > (R * 2))
+        if (fw > (r * 2))
         {
             using var fg = new SKPaint();
             fg.Color = fillColor;
             fg.IsAntialias = true;
-            canvas.DrawRoundRect(SKRect.Create(x, y, fw, h), R, R, fg);
+            canvas.DrawRoundRect(SKRect.Create(x, y, fw, h), r, r, fg);
         }
     }
 

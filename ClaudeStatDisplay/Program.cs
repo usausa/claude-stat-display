@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 using ClaudeStatDisplay;
 
 using Microsoft.Extensions.Hosting.WindowsServices;
@@ -63,5 +65,11 @@ var app = builder.Build();
 
 app.UseMiddleware<ClaudeProxyMiddleware>();
 app.MapReverseProxy();
+
+// Startup
+var log = app.Services.GetRequiredService<ILogger<Program>>();
+log.InfoServiceStart();
+log.InfoServiceSettingsRuntime(RuntimeInformation.OSDescription, RuntimeInformation.FrameworkDescription, RuntimeInformation.RuntimeIdentifier);
+log.InfoServiceSettingsEnvironment(typeof(Program).Assembly.GetName().Version, Environment.CurrentDirectory);
 
 app.Run();

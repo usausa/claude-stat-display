@@ -38,6 +38,6 @@ internal sealed class Theme
         ColorWarn     = new SKColor(0xD9, 0xA3, 0x1C),
         ColorError    = new SKColor(0xD9, 0x52, 0x52),
         BarBgColor    = new SKColor(0x24, 0x24, 0x24),
-        FontFamily    = "Consolas",
+        FontFamily    = "Consolas"
     };
 }

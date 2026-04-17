@@ -1,4 +1,4 @@
-namespace MacStatDisplay;
+namespace ClaudeStatDisplay;
 
 internal static partial class Log
 {

@@ -12,6 +12,8 @@ internal sealed class ClaudeProxyMiddleware
 
     private readonly DisplayStateStore stateStore;
 
+    private DisplayState lastState = DisplayState.Empty;
+
     public ClaudeProxyMiddleware(RequestDelegate next, DisplayStateStore stateStore)
     {
         this.next = next;
@@ -57,7 +59,7 @@ internal sealed class ClaudeProxyMiddleware
         var rateLimitInfo = ParseRateLimitHeaders(upstreamHeaders);
         var (usageInfo, model) = ParseResponseBody(bodyText, contentType);
 
-        var current = stateStore.GetState();
+        var current = lastState;
         var merged = new DisplayState(
             model ?? current.Model,
             new UsageInfo(
@@ -75,6 +77,7 @@ internal sealed class ClaudeProxyMiddleware
                 rateLimitInfo.OverageStatus ?? current.RateLimit.OverageStatus,
                 rateLimitInfo.OverageDisabledReason ?? current.RateLimit.OverageDisabledReason));
 
+        lastState = merged;
         stateStore.UpdateState(merged);
     }
 

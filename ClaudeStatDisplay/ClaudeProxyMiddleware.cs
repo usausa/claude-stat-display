@@ -8,28 +8,14 @@ internal sealed class ClaudeProxyMiddleware
 {
     public const string UpstreamHeadersKey = "__ClaudeProxy_UpstreamHeaders";
 
-    private static readonly Dictionary<string, int> ContextWindowSizes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "claude-opus-4",     200_000 },
-        { "claude-sonnet-4",   200_000 },
-        { "claude-haiku-4",    200_000 },
-        { "claude-3-7-sonnet", 200_000 },
-        { "claude-3-5-sonnet", 200_000 },
-        { "claude-3-5-haiku",  200_000 },
-        { "claude-3-opus",     200_000 },
-        { "claude-3-sonnet",   200_000 },
-        { "claude-3-haiku",    200_000 }
-    };
-
     private readonly RequestDelegate next;
-    private readonly DisplayStateStore imageStore;
-    private readonly Lock stateLock = new();
-    private DisplayState? lastState;
 
-    public ClaudeProxyMiddleware(RequestDelegate next, DisplayStateStore imageStore)
+    private readonly DisplayStateStore stateStore;
+
+    public ClaudeProxyMiddleware(RequestDelegate next, DisplayStateStore stateStore)
     {
         this.next = next;
-        this.imageStore = imageStore;
+        this.stateStore = stateStore;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -71,54 +57,25 @@ internal sealed class ClaudeProxyMiddleware
         var rateLimitInfo = ParseRateLimitHeaders(upstreamHeaders);
         var (usageInfo, model) = ParseResponseBody(bodyText, contentType);
 
-        DisplayState state;
-        lock (stateLock)
-        {
-            var merged = new DisplayState(
-                model ?? lastState?.Model,
-                new UsageInfo(
-                    usageInfo.InputTokens ?? lastState?.Usage.InputTokens,
-                    usageInfo.OutputTokens ?? lastState?.Usage.OutputTokens,
-                    usageInfo.CacheCreationInputTokens ?? lastState?.Usage.CacheCreationInputTokens,
-                    usageInfo.CacheReadInputTokens ?? lastState?.Usage.CacheReadInputTokens),
-                new RateLimitInfo(
-                    rateLimitInfo.FiveHourStatus ?? lastState?.RateLimit.FiveHourStatus,
-                    rateLimitInfo.FiveHourUtilization ?? lastState?.RateLimit.FiveHourUtilization,
-                    rateLimitInfo.FiveHourReset ?? lastState?.RateLimit.FiveHourReset,
-                    rateLimitInfo.SevenDayStatus ?? lastState?.RateLimit.SevenDayStatus,
-                    rateLimitInfo.SevenDayUtilization ?? lastState?.RateLimit.SevenDayUtilization,
-                    rateLimitInfo.SevenDayReset ?? lastState?.RateLimit.SevenDayReset,
-                    rateLimitInfo.OverageStatus ?? lastState?.RateLimit.OverageStatus,
-                    rateLimitInfo.OverageDisabledReason ?? lastState?.RateLimit.OverageDisabledReason));
-            // TODO これは不要では無いのか？
-            if (merged == lastState)
-            {
-                return;
-            }
-            lastState = merged;
-            state = merged;
-        }
+        var current = stateStore.GetState();
+        var merged = new DisplayState(
+            model ?? current.Model,
+            new UsageInfo(
+                usageInfo.InputTokens ?? current.Usage.InputTokens,
+                usageInfo.OutputTokens ?? current.Usage.OutputTokens,
+                usageInfo.CacheCreationInputTokens ?? current.Usage.CacheCreationInputTokens,
+                usageInfo.CacheReadInputTokens ?? current.Usage.CacheReadInputTokens),
+            new RateLimitInfo(
+                rateLimitInfo.FiveHourStatus ?? current.RateLimit.FiveHourStatus,
+                rateLimitInfo.FiveHourUtilization ?? current.RateLimit.FiveHourUtilization,
+                rateLimitInfo.FiveHourReset ?? current.RateLimit.FiveHourReset,
+                rateLimitInfo.SevenDayStatus ?? current.RateLimit.SevenDayStatus,
+                rateLimitInfo.SevenDayUtilization ?? current.RateLimit.SevenDayUtilization,
+                rateLimitInfo.SevenDayReset ?? current.RateLimit.SevenDayReset,
+                rateLimitInfo.OverageStatus ?? current.RateLimit.OverageStatus,
+                rateLimitInfo.OverageDisabledReason ?? current.RateLimit.OverageDisabledReason));
 
-        imageStore.UpdateState(state);
-    }
-
-    // TODO 移動、ContextWindowSizesの定義も
-    internal static int GetContextWindowSize(string? model)
-    {
-        if (model is null)
-        {
-            return 0;
-        }
-
-        foreach (var (prefix, size) in ContextWindowSizes)
-        {
-            if (model.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return size;
-            }
-        }
-
-        return 0;
+        stateStore.UpdateState(merged);
     }
 
     private static RateLimitInfo ParseRateLimitHeaders(Dictionary<string, string>? headers)
@@ -183,30 +140,27 @@ internal sealed class ClaudeProxyMiddleware
     private static (UsageInfo Usage, string? Model) ParseSseBody(string body)
     {
         var inputTokens = default(int?);
-        // TODO default(int?)の記述に変子う
-        int? outputTokens = null;
-        int? cacheCreationInputTokens = null;
-        int? cacheReadInputTokens = null;
+        var outputTokens = default(int?);
+        var cacheCreationInputTokens = default(int?);
+        var cacheReadInputTokens = default(int?);
         string? model = null;
 
-        // TODO spanベースに変更
-        foreach (var line in body.Split('\n'))
+        foreach (var line in body.AsSpan().EnumerateLines())
         {
-            var trimmed = line.TrimEnd('\r');
-            if (!trimmed.StartsWith("data: ", StringComparison.Ordinal))
+            if (!line.StartsWith("data: ", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var json = trimmed[6..];
-            if (json == "[DONE]")
+            var json = line[6..];
+            if (json is "[DONE]")
             {
                 continue;
             }
 
             try
             {
-                using var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json.ToString());
                 var root = doc.RootElement;
 
                 if (!root.TryGetProperty("type", out var typeProp))

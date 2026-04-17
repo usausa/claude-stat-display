@@ -12,6 +12,8 @@ internal sealed class ClaudeProxyMiddleware
 
     private readonly DisplayStateStore stateStore;
 
+    private readonly Lock stateLock = new();
+
     private DisplayState lastState = DisplayState.Empty;
 
     public ClaudeProxyMiddleware(RequestDelegate next, DisplayStateStore stateStore)
@@ -59,25 +61,28 @@ internal sealed class ClaudeProxyMiddleware
         var rateLimitInfo = ParseRateLimitHeaders(upstreamHeaders);
         var (usageInfo, model) = ParseResponseBody(bodyText, contentType);
 
-        var current = lastState;
-        var merged = new DisplayState(
-            model ?? current.Model,
-            new UsageInfo(
-                usageInfo.InputTokens ?? current.Usage.InputTokens,
-                usageInfo.OutputTokens ?? current.Usage.OutputTokens,
-                usageInfo.CacheCreationInputTokens ?? current.Usage.CacheCreationInputTokens,
-                usageInfo.CacheReadInputTokens ?? current.Usage.CacheReadInputTokens),
-            new RateLimitInfo(
-                rateLimitInfo.FiveHourStatus ?? current.RateLimit.FiveHourStatus,
-                rateLimitInfo.FiveHourUtilization ?? current.RateLimit.FiveHourUtilization,
-                rateLimitInfo.FiveHourReset ?? current.RateLimit.FiveHourReset,
-                rateLimitInfo.SevenDayStatus ?? current.RateLimit.SevenDayStatus,
-                rateLimitInfo.SevenDayUtilization ?? current.RateLimit.SevenDayUtilization,
-                rateLimitInfo.SevenDayReset ?? current.RateLimit.SevenDayReset,
-                rateLimitInfo.OverageStatus ?? current.RateLimit.OverageStatus,
-                rateLimitInfo.OverageDisabledReason ?? current.RateLimit.OverageDisabledReason));
-
-        lastState = merged;
+        DisplayState merged;
+        lock (stateLock)
+        {
+            var current = lastState;
+            merged = new DisplayState(
+                model ?? current.Model,
+                new UsageInfo(
+                    usageInfo.InputTokens ?? current.Usage.InputTokens,
+                    usageInfo.OutputTokens ?? current.Usage.OutputTokens,
+                    usageInfo.CacheCreationInputTokens ?? current.Usage.CacheCreationInputTokens,
+                    usageInfo.CacheReadInputTokens ?? current.Usage.CacheReadInputTokens),
+                new RateLimitInfo(
+                    rateLimitInfo.FiveHourStatus ?? current.RateLimit.FiveHourStatus,
+                    rateLimitInfo.FiveHourUtilization ?? current.RateLimit.FiveHourUtilization,
+                    rateLimitInfo.FiveHourReset ?? current.RateLimit.FiveHourReset,
+                    rateLimitInfo.SevenDayStatus ?? current.RateLimit.SevenDayStatus,
+                    rateLimitInfo.SevenDayUtilization ?? current.RateLimit.SevenDayUtilization,
+                    rateLimitInfo.SevenDayReset ?? current.RateLimit.SevenDayReset,
+                    rateLimitInfo.OverageStatus ?? current.RateLimit.OverageStatus,
+                    rateLimitInfo.OverageDisabledReason ?? current.RateLimit.OverageDisabledReason));
+            lastState = merged;
+        }
         stateStore.UpdateState(merged);
     }
 

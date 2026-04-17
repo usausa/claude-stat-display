@@ -6,9 +6,6 @@ using System.Text.Json;
 
 internal sealed class ClaudeProxyMiddleware
 {
-    private static readonly Action<ILogger, string, Exception?> LogProxyInfo =
-        LoggerMessage.Define<string>(LogLevel.Information, new EventId(0), "{Info}");
-
     public const string UpstreamHeadersKey = "ClaudeProxy_UpstreamHeaders";
 
     private static readonly Dictionary<string, int> ContextWindowSizes = new(StringComparer.OrdinalIgnoreCase)
@@ -25,15 +22,13 @@ internal sealed class ClaudeProxyMiddleware
     };
 
     private readonly RequestDelegate next;
-    private readonly ILogger<ClaudeProxyMiddleware> logger;
     private readonly DisplayStateStore imageStore;
     private readonly Lock stateLock = new();
     private DisplayState? lastState;
 
-    public ClaudeProxyMiddleware(RequestDelegate next, ILogger<ClaudeProxyMiddleware> logger, DisplayStateStore imageStore)
+    public ClaudeProxyMiddleware(RequestDelegate next, DisplayStateStore imageStore)
     {
         this.next = next;
-        this.logger = logger;
         this.imageStore = imageStore;
     }
 
@@ -65,7 +60,6 @@ internal sealed class ClaudeProxyMiddleware
 
     private async Task LogResponseAsync(HttpContext context, MemoryStream buffer)
     {
-        var statusCode = context.Response.StatusCode;
         var contentType = context.Response.ContentType ?? string.Empty;
 
         buffer.Seek(0, SeekOrigin.Begin);
@@ -103,68 +97,6 @@ internal sealed class ClaudeProxyMiddleware
             lastState = merged;
             stateToLog = merged;
         }
-
-        var sb = new StringBuilder();
-        sb.AppendLine();
-        sb.AppendLine(CultureInfo.InvariantCulture, $"  ┌─── {context.Request.Method} {context.Request.Path} [{statusCode}]");
-
-        if (stateToLog.Model is not null)
-        {
-            sb.AppendLine(CultureInfo.InvariantCulture, $"  │  Model: {stateToLog.Model}");
-        }
-
-        var u = stateToLog.Usage;
-        if (u.InputTokens is not null)
-        {
-            var contextWindowSize = GetContextWindowSize(stateToLog.Model);
-            sb.AppendLine("  │  Token Usage:");
-
-            var cacheRead    = u.CacheReadInputTokens ?? 0;
-            var cacheCreated = u.CacheCreationInputTokens ?? 0;
-            if ((cacheRead > 0) || (cacheCreated > 0))
-            {
-                sb.AppendLine(CultureInfo.InvariantCulture, $"  │    Input:   {u.InputTokens.Value,8:N0}  (cache read: {cacheRead:N0} / created: {cacheCreated:N0})");
-            }
-            else
-            {
-                sb.AppendLine(CultureInfo.InvariantCulture, $"  │    Input:   {u.InputTokens.Value,8:N0}");
-            }
-
-            if (u.OutputTokens > 0)
-            {
-                sb.AppendLine(CultureInfo.InvariantCulture, $"  │    Output:  {u.OutputTokens.GetValueOrDefault(),8:N0}");
-            }
-
-            if (contextWindowSize > 0)
-            {
-                // コンテキストウィンドウ使用量はキャッシュ読み込み分も含む入力トークン全体で算出
-                var totalInputTokens = u.InputTokens.Value + cacheRead + cacheCreated;
-                var percentage = ((double)totalInputTokens / contextWindowSize) * 100.0;
-                sb.AppendLine(CultureInfo.InvariantCulture, $"  │    Context: {totalInputTokens:N0} / {contextWindowSize:N0} ({percentage:F1}% of context window used)");
-            }
-        }
-
-        var rl = stateToLog.RateLimit;
-        if ((rl.FiveHourStatus is not null) || (rl.SevenDayStatus is not null))
-        {
-            sb.AppendLine("  │  Rate Limits:");
-
-            if (rl.FiveHourStatus is not null)
-            {
-                var resetStr = rl.FiveHourReset?.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture) ?? "—";
-                sb.AppendLine(CultureInfo.InvariantCulture, $"  │    5h:  {(rl.FiveHourUtilization ?? 0) * 100,5:F1}%  [{rl.FiveHourStatus}]  (resets {resetStr})");
-            }
-
-            if (rl.SevenDayStatus is not null)
-            {
-                var resetStr = rl.SevenDayReset?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture) ?? "—";
-                sb.AppendLine(CultureInfo.InvariantCulture, $"  │    7d:  {(rl.SevenDayUtilization ?? 0) * 100,5:F1}%  [{rl.SevenDayStatus}]  (resets {resetStr})");
-            }
-        }
-
-        sb.Append("  └────────────────────────────────────────────────");
-
-        LogProxyInfo(logger, sb.ToString(), null);
 
         imageStore.UpdateState(stateToLog);
     }

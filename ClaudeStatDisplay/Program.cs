@@ -6,8 +6,6 @@ using Microsoft.Extensions.Hosting.WindowsServices;
 
 using Serilog;
 
-using Yarp.ReverseProxy.Transforms;
-
 //--------------------------------------------------------------------------------
 // Configure builder
 //--------------------------------------------------------------------------------
@@ -37,26 +35,7 @@ builder.Services.AddHostedService<DashboardWorker>();
 // Reverse proxy
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
-    .AddTransforms(transformBuilderContext =>
-    {
-        transformBuilderContext.AddResponseTransform(transformContext =>
-        {
-            if (transformContext.ProxyResponse is { } proxyResponse)
-            {
-                var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var (key, values) in proxyResponse.Headers)
-                {
-                    if (key.StartsWith("anthropic-", StringComparison.OrdinalIgnoreCase) ||
-                        key.Equals("retry-after", StringComparison.OrdinalIgnoreCase))
-                    {
-                        headers[key] = string.Join(", ", values);
-                    }
-                }
-                transformContext.HttpContext.Items[ClaudeProxyMiddleware.UpstreamHeadersKey] = headers;
-            }
-            return ValueTask.CompletedTask;
-        });
-    });
+    .AddClaudeProxyTransforms();
 
 //--------------------------------------------------------------------------------
 // Configure the HTTP request pipeline.

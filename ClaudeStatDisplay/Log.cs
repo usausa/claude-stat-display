@@ -13,6 +13,14 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Information, Message = "Environment: version=[{version}], directory=[{directory}]")]
     public static partial void InfoServiceSettingsEnvironment(this ILogger logger, Version? version, string directory);
 
+    // DashboardWorker
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "LCD display error.")]
+    public static partial void WarnLcdDisplayError(this ILogger logger, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Dashboard render failed: {error}")]
+    public static partial void DebugRenderFailed(this ILogger logger, string error);
+
     // Error
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Unknown exception.")]

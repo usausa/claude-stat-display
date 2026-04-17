@@ -6,28 +6,22 @@ using LcdDriver.TrofeoVision;
 
 internal sealed class DashboardWorker : BackgroundService
 {
-    private static readonly Action<ILogger, Exception?> LogLcdDisplayError =
-        LoggerMessage.Define(LogLevel.Warning, new EventId(0), "LCD display error.");
-
-    private static readonly Action<ILogger, string, Exception?> LogRenderFailed =
-        LoggerMessage.Define<string>(LogLevel.Debug, new EventId(1), "Dashboard render failed: {Error}");
-
     private const int RetryDelaySeconds = 5;
 
-    private readonly DisplayStateStore imageStore;
-    private readonly ILogger<DashboardWorker> logger;
+    private readonly DisplayStateStore store;
+    private readonly ILogger<DashboardWorker> log;
 
-    public DashboardWorker(DisplayStateStore imageStore, ILogger<DashboardWorker> logger)
+    public DashboardWorker(ILogger<DashboardWorker> log, DisplayStateStore store)
     {
-        this.imageStore = imageStore;
-        this.logger = logger;
+        this.log = log;
+        this.store = store;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-#pragma warning disable CA1031 // ハードウェア接続リトライループのため、すべての例外を捕捉する必要がある
+#pragma warning disable CA1031
             try
             {
                 await RunDisplayLoopAsync(stoppingToken).ConfigureAwait(false);
@@ -38,7 +32,7 @@ internal sealed class DashboardWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                LogLcdDisplayError(logger, ex);
+                log.WarnLcdDisplayError(ex);
             }
 #pragma warning restore CA1031
 
@@ -54,7 +48,6 @@ internal sealed class DashboardWorker : BackgroundService
         var hidDevice = DeviceList.Local
             .GetHidDevices(ScreenDevice.VendorId, ScreenDevice.ProductId)
             .FirstOrDefault();
-
         if (hidDevice is null)
         {
             return;
@@ -62,16 +55,16 @@ internal sealed class DashboardWorker : BackgroundService
 
         using var screen = new ScreenDevice(hidDevice);
 
-        DisplayState? lastRenderedState = null;
-        byte[]? currentImage = null;
+        var  lastRenderedState = default(DisplayState?);
+        var currentImage = default(byte[]?);
 
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
         {
-            var state = imageStore.GetState();
+            var state = store.GetState();
             if (state != lastRenderedState)
             {
-#pragma warning disable CA1031 // 描画・書き込み失敗時は最後の画像を継続表示するため、すべての例外を捕捉する
+#pragma warning disable CA1031
                 try
                 {
                     currentImage = DashboardRenderer.Render(state);
@@ -79,7 +72,7 @@ internal sealed class DashboardWorker : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    LogRenderFailed(logger, ex.Message, null);
+                    log.DebugRenderFailed(ex.Message);
                 }
 #pragma warning restore CA1031
             }

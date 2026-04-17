@@ -56,8 +56,10 @@ internal sealed class DashboardWorker : BackgroundService
 
         using var screen = new ScreenDevice(hidDevice);
 
-        var  lastRenderedState = default(DisplayState?);
-        var currentImage = default(byte[]?);
+        var lastRenderedState = DisplayState.Empty;
+        var currentImage = DashboardRenderer.Render(lastRenderedState);
+
+        screen.DrawJpeg(currentImage);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -68,10 +70,7 @@ internal sealed class DashboardWorker : BackgroundService
                 lastRenderedState = state;
             }
 
-            if (currentImage is not null)
-            {
-                screen.DrawJpeg(currentImage);
-            }
+            screen.DrawJpeg(currentImage);
         }
     }
 }

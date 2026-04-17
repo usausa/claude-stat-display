@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="AGENTS.md" />
+    <File Path="Analyzers.ruleset" />
+    <File Path="CLAUDE.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="LICENSE" />
+    <File Path="ClaudeStatDisplay.sln.DotSettings" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="ClaudeStatDisplay/ClaudeStatDisplay.csproj" Id="1fb834a9-26a7-401a-9dbe-f442f8642fee" />
+</Solution>

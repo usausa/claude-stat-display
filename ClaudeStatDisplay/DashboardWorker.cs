@@ -8,12 +8,13 @@ internal sealed class DashboardWorker : BackgroundService
 {
     private const int RetryDelaySeconds = 5;
 
-    private readonly DisplayStateStore store;
-    private readonly ILogger<DashboardWorker> logger;
+    private readonly ILogger<DashboardWorker> log;
 
-    public DashboardWorker(ILogger<DashboardWorker> logger, DisplayStateStore store)
+    private readonly DisplayStateStore store;
+
+    public DashboardWorker(ILogger<DashboardWorker> log, DisplayStateStore store)
     {
-        this.logger = logger;
+        this.log = log;
         this.store = store;
     }
 
@@ -32,7 +33,7 @@ internal sealed class DashboardWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                logger.ErrorUnknownException(ex);
+                log.ErrorUnknownException(ex);
             }
 #pragma warning restore CA1031
 

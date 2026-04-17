@@ -59,11 +59,10 @@ internal sealed class DashboardWorker : BackgroundService
         var  lastRenderedState = default(DisplayState?);
         var currentImage = default(byte[]?);
 
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+        while (!stoppingToken.IsCancellationRequested)
         {
-            var state = store.GetState();
-            if (state != lastRenderedState)
+            var state = await store.WaitForUpdateAsync(TimeSpan.FromSeconds(1), stoppingToken).ConfigureAwait(false);
+            if ((state is not null) && (state != lastRenderedState))
             {
                 currentImage = DashboardRenderer.Render(state);
                 lastRenderedState = state;

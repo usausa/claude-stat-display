@@ -71,7 +71,9 @@ internal static class DashboardRenderer
 
     private static void DrawHeader(SKCanvas canvas)
     {
-        using var bg = new SKPaint { Color = T.HeaderBg, IsAntialias = true };
+        using var bg = new SKPaint();
+        bg.Color = T.HeaderBg;
+        bg.IsAntialias = true;
         canvas.DrawRect(SKRect.Create(0, 0, CanvasW, HeaderH), bg);
 
         DrawText(canvas, "CLAUDE API MONITOR", PanelPad, HeaderTitleY, T.AccentColor, FontSizeTitle, bold: true);
@@ -83,7 +85,10 @@ internal static class DashboardRenderer
 
     private static void DrawDividers(SKCanvas canvas)
     {
-        using var p = new SKPaint { Color = T.BorderColor, StrokeWidth = 1, Style = SKPaintStyle.Stroke };
+        using var p = new SKPaint();
+        p.Color = T.BorderColor;
+        p.StrokeWidth = 1;
+        p.Style = SKPaintStyle.Stroke;
         canvas.DrawLine(0, HeaderH, CanvasW, HeaderH, p);
         canvas.DrawLine(MidX, HeaderH, MidX, CanvasH, p);
     }
@@ -219,13 +224,17 @@ internal static class DashboardRenderer
 
     private static void DrawBar(SKCanvas canvas, float x, float y, float w, float h, float fraction, SKColor fillColor)
     {
-        using var bg = new SKPaint { Color = T.BarBgColor, IsAntialias = true };
+        using var bg = new SKPaint();
+        bg.Color = T.BarBgColor;
+        bg.IsAntialias = true;
         canvas.DrawRoundRect(SKRect.Create(x, y, w, h), BarRadius, BarRadius, bg);
 
         var fw = Math.Max(0f, Math.Min(w, w * fraction));
         if (fw > (BarRadius * 2))
         {
-            using var fg = new SKPaint { Color = fillColor, IsAntialias = true };
+            using var fg = new SKPaint();
+            fg.Color = fillColor;
+            fg.IsAntialias = true;
             canvas.DrawRoundRect(SKRect.Create(x, y, fw, h), BarRadius, BarRadius, fg);
         }
     }
@@ -241,8 +250,11 @@ internal static class DashboardRenderer
     private static void DrawText(SKCanvas canvas, string text, float x, float y, SKColor color, float size, bool bold = false)
     {
         var typeface = bold ? FontBold : FontNormal;
-        using var font  = new SKFont(typeface, size) { Edging = SKFontEdging.SubpixelAntialias };
-        using var paint = new SKPaint { Color = color, IsAntialias = true };
+        using var font  = new SKFont(typeface, size);
+        font.Edging = SKFontEdging.SubpixelAntialias;
+        using var paint = new SKPaint();
+        paint.Color = color;
+        paint.IsAntialias = true;
         canvas.DrawText(text, x, y, font, paint);
     }
 
@@ -254,7 +266,7 @@ internal static class DashboardRenderer
     }
 
     private static string FormatNullableInt(int? value)
-        => value.HasValue ? value.Value.ToString("N0", CultureInfo.InvariantCulture) : "—";
+        => value?.ToString("N0", CultureInfo.InvariantCulture) ?? "—";
 
     private static SKTypeface ResolveTypeface(bool bold)
     {

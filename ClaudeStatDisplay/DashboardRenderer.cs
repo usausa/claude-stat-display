@@ -303,7 +303,7 @@ internal static class DashboardRenderer
         using var paint = new SKPaint();
         paint.Color = color;
         paint.IsAntialias = true;
-        canvas.DrawText(text, x, y, font, paint);
+        canvas.DrawText(text, x, y, SKTextAlign.Left, font, paint);
     }
 
     private static float MeasureText(string text, float size, bool bold = false)

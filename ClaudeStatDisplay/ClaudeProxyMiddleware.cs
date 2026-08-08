@@ -67,11 +67,7 @@ internal sealed class ClaudeProxyMiddleware
             var current = lastState;
             merged = new DisplayState(
                 model ?? current.Model,
-                new UsageInfo(
-                    usageInfo.InputTokens ?? current.Usage.InputTokens,
-                    usageInfo.OutputTokens ?? current.Usage.OutputTokens,
-                    usageInfo.CacheCreationInputTokens ?? current.Usage.CacheCreationInputTokens,
-                    usageInfo.CacheReadInputTokens ?? current.Usage.CacheReadInputTokens),
+                usageInfo,
                 new RateLimitInfo(
                     rateLimitInfo.FiveHourStatus ?? current.RateLimit.FiveHourStatus,
                     rateLimitInfo.FiveHourUtilization ?? current.RateLimit.FiveHourUtilization,
@@ -155,12 +151,16 @@ internal sealed class ClaudeProxyMiddleware
 
         foreach (var line in body.AsSpan().EnumerateLines())
         {
-            if (!line.StartsWith("data: ", StringComparison.Ordinal))
+            if (!line.StartsWith("data:", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var json = line[6..];
+            var json = line[5..];
+            if (json.StartsWith(" ", StringComparison.Ordinal))
+            {
+                json = json[1..];
+            }
             if (json is "[DONE]")
             {
                 continue;
@@ -237,6 +237,6 @@ internal sealed class ClaudeProxyMiddleware
         return (UsageInfo.Empty, model);
     }
 
-    private static int GetInt(JsonElement element, string propertyName)
-        => element.TryGetProperty(propertyName, out var prop) && prop.TryGetInt32(out var value) ? value : 0;
+    private static int? GetInt(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var prop) && prop.TryGetInt32(out var value) ? value : null;
 }

@@ -18,7 +18,7 @@ internal static class ClaudeProxyExtensions
                         if (key.StartsWith("anthropic-", StringComparison.OrdinalIgnoreCase) ||
                             key.Equals("retry-after", StringComparison.OrdinalIgnoreCase))
                         {
-                            headers[key] = string.Join(", ", values);
+                            headers[key] = String.Join(", ", values);
                         }
                     }
                     transform.HttpContext.Items[ClaudeProxyMiddleware.UpstreamHeadersKey] = headers;

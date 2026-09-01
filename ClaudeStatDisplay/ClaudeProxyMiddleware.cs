@@ -105,10 +105,10 @@ internal sealed class ClaudeProxyMiddleware
         => headers.TryGetValue(name, out var value) ? value : null;
 
     private static double? ParseDoubleHeader(Dictionary<string, string> headers, string name)
-        => headers.TryGetValue(name, out var value) && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) ? result : null;
+        => headers.TryGetValue(name, out var value) && Double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) ? result : null;
 
     private static DateTimeOffset? ParseUnixTimestampHeader(Dictionary<string, string> headers, string name)
-        => headers.TryGetValue(name, out var value) && long.TryParse(value, out var result) ? DateTimeOffset.FromUnixTimeSeconds(result) : null;
+        => headers.TryGetValue(name, out var value) && Int64.TryParse(value, out var result) ? DateTimeOffset.FromUnixTimeSeconds(result) : null;
 
     private static (UsageInfo Usage, string? Model) ParseResponseBody(string body, string contentType)
     {

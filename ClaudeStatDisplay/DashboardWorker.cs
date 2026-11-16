@@ -47,7 +47,7 @@ internal sealed class DashboardWorker : BackgroundService
     private async Task RunDisplayLoopAsync(CancellationToken stoppingToken)
     {
         var hidDevice = DeviceList.Local
-            .GetHidDevices(ScreenDevice.VendorId, ScreenDevice.ProductId)
+            .GetHidDevices(UsbIds.VendorId, UsbIds.ProductId)
             .FirstOrDefault();
         if (hidDevice is null)
         {
